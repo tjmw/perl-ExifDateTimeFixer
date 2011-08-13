@@ -95,21 +95,21 @@ method process_photos () {
         $exif->ExtractInfo($photo_filename);
 
         for my $tag (@exif_tags) {
-            my $existing_datetime_string = $exif->GetValue($tag);
+            my $existing_exif_datetime_string = $exif->GetValue($tag);
 
-            my $camera_datetime =
-                $self->_parse_camera_formatted_datetime($existing_datetime_string);
+            my $exif_datetime =
+                $self->_parse_camera_formatted_datetime($existing_exif_datetime_string);
 
-            my $adjusted_datetime =
-                $camera_datetime->clone->add_duration($self->_camera_off_duration);
+            my $adjusted_exif_datetime =
+                $exif_datetime->clone->add_duration($self->_camera_off_duration);
 
-            my $adjusted_datetime_string =
-                $self->_build_camera_formatted_datetime($adjusted_datetime);
+            my $adjusted_exif_datetime_string =
+                $self->_build_camera_formatted_datetime($adjusted_exif_datetime);
 
             print "$photo_filename: modifying $tag"
-                . " from $existing_datetime_string to $adjusted_datetime_string\n";
+                . " from $existing_exif_datetime_string to $adjusted_exif_datetime_string\n";
 
-            $exif->SetNewValue($tag, $adjusted_datetime_string);
+            $exif->SetNewValue($tag, $adjusted_exif_datetime_string);
         }   
 
         $exif->WriteInfo($photo_filename) unless $self->dry_run;
