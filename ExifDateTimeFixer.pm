@@ -201,3 +201,7 @@ __PACKAGE__->new_with_options()->process_photos unless caller();
 =head1 AUTHOR
 
 Tom Wey <tjmwey at gmail dot com>
+
+=cut
+
+1;
