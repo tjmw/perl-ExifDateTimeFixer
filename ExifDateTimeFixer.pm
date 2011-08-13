@@ -2,7 +2,7 @@ package ExifDateTimeFixer;
 
 use Moose;
 use Moose::Util::TypeConstraints;
-use MooseX::Types::DateTime qw(TimeZone);
+use MooseX::Types::DateTime;
 use MooseX::Method::Signatures;
 
 use Image::ExifTool;
