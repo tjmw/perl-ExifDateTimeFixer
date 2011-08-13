@@ -65,14 +65,36 @@ has '_camera_off_duration' => (
     },
 );
 
-has '_exiftool' => (
-    is        => 'ro',
-    isa       => 'Image::ExifTool',
-    lazy      => 1,
-    default   => sub { Image::ExifTool->new },
-);
-
 method process_photos () {
+    my @tags = qw(DateTimeOriginal ModifyDate CreateDate);
+
+    # Iterate over our list of photos, updating the specified tags
+    for my $photo_filename (@{$self->_photos}) {
+        my $exif = Image::ExifTool->new; 
+
+        $exif->ExtractInfo($photo_filename);
+
+        for my $tag (@tags) {
+            my $existing_datetime_string = $exif->GetValue($tag);
+
+            my $camera_datetime =
+                $self->parse_camera_formatted_datetime($existing_datetime_string)
+                ->set_time_zone('UCT');
+
+            my $adjusted_datetime =
+                $camera_datetime->clone->add_duration($camera_out_duration);
+
+            my $adjusted_datetime_string =
+                $self->build_camera_formatted_datetime($adjusted_datetime);
+
+            print "$photo_filename: updating $tag"
+                . " from $existing_datetime_string to $adjusted_datetime_string\n";
+
+            $exif->SetNewValue($tag, $adjusted_datetime_string);
+        }   
+
+        $exif->WriteInfo($photo_filename) unless $self->dry_run;
+    }
 }
 
 method parse_camera_formatted_datetime (Str $datetime) {
