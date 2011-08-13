@@ -12,6 +12,43 @@ use DateTime::Format::MySQL;
 
 with 'MooseX::Getopt';
 
+=head1 NAME
+
+ExifDateTimeFixer
+
+=head1 DESCRIPTION
+
+Fixes the Exif datetime metadata on photos taken with my broken Panasonic
+Lumix compact camera (broken buttons mean I can't set the date time so it's
+way out).
+
+It works by taking whatever the camera's definition of now is, as provided
+by the user, figuring out how far out its clock is, and adjusting the date
+time Exif data on photos accordingly.
+
+=head1 SYNOPSIS
+
+This module is designed to be run directly from the command line, though it
+could also be invoked from a script if required.
+
+The following command line flags are supported:
+
+--camera_now
+
+The camera's definition of now, in MySQL datetime format. Required.
+
+--dry_run
+
+Dry run only, don't write adjusted date time data back to file. Optional.
+
+Examples:
+
+    perl ExifDateTimeFixer.pm --dry_run --camera_now "2008-06-08 06:08:00" ~/photos_with_bad_data/*.jpg
+
+    perl ExifDateTimeFixer.pm --camera_now "2008-06-08 06:08:00" ~/photos_with_bad_data/*.jpg
+
+=cut
+
 # See http://search.cpan.org/~doy/Moose-2.0202/
 #   lib/Moose/Manual/BestPractices.pod#Do_not_coerce_class_names_directly
 subtype 'My::DateTime' => as class_type('DateTime');
@@ -53,6 +90,7 @@ has 'time_zone' => (
 );
 
 # Array ref of filenames
+# TODO: Better checking/validation of this data
 has '_photos' => (
     is       => 'ro',
     isa      => 'ArrayRef',
@@ -84,6 +122,15 @@ has '_camera_off_duration' => (
             - $self->_camera_now_dt
     },
 );
+
+=head1 METHODS
+
+=head2 process_photos
+
+Iterate over the photos specified, adjusting the Exif date time data,
+as described above, based on the flags and file list provided.
+
+=cut
 
 method process_photos () {
     my @exif_tags = qw(DateTimeOriginal ModifyDate CreateDate);
@@ -150,3 +197,7 @@ method _build_camera_formatted_datetime(DateTime $datetime) {
 
 # I'm a modulino yo!
 __PACKAGE__->new_with_options()->process_photos unless caller();
+
+=head1 AUTHOR
+
+Tom Wey <tjmwey at gmail dot com>
