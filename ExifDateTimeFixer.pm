@@ -54,10 +54,10 @@ Examples:
 subtype 'My::DateTime' => as class_type('DateTime');
 
 coerce 'My::DateTime'
-	=> from 'Str'
-		=> via {
-            DateTime::Format::MySQL->parse_datetime($_)
-        };
+    => from 'Str'
+    => via {
+        DateTime::Format::MySQL->parse_datetime($_)
+    };
 
 # The camera's definition of now
 has 'camera_now' => (
@@ -113,7 +113,7 @@ has '_camera_now_dt' => (
 );
 
 has '_camera_off_duration' => (
-    is       => 'ro',	
+    is       => 'ro',
     isa      => 'DateTime::Duration',
     lazy     => 1,
     default  => sub {
