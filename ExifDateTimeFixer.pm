@@ -9,6 +9,7 @@ use Image::ExifTool;
 
 use DateTime;
 use DateTime::Format::MySQL;
+use DateTime::Format::Exif;
 
 with 'MooseX::Getopt';
 
@@ -142,57 +143,24 @@ method process_photos () {
         $exif->ExtractInfo($photo_filename);
 
         for my $tag (@exif_tags) {
-            my $existing_exif_datetime_string = $exif->GetValue($tag);
+            my $existing_exif_dt_string = $exif->GetValue($tag);
+            my $existing_exif_dt =
+                DateTime::Format::Exif->parse_datetime($existing_exif_dt_string);
 
-            my $exif_datetime =
-                $self->_parse_camera_formatted_datetime($existing_exif_datetime_string);
+            my $adjusted_exif_dt =
+                $existing_exif_dt->clone->add_duration($self->_camera_off_duration);
 
-            my $adjusted_exif_datetime =
-                $exif_datetime->clone->add_duration($self->_camera_off_duration);
-
-            my $adjusted_exif_datetime_string =
-                $self->_build_camera_formatted_datetime($adjusted_exif_datetime);
+            my $adjusted_exif_dt_string =
+                DateTime::Format::Exif->format_datetime($adjusted_exif_dt);
 
             print "$photo_filename: modifying $tag"
-                . " from $existing_exif_datetime_string to $adjusted_exif_datetime_string\n";
+                . " from $existing_exif_dt_string to $adjusted_exif_dt_string\n";
 
-            $exif->SetNewValue($tag, $adjusted_exif_datetime_string);
+            $exif->SetNewValue($tag, $adjusted_exif_dt_string);
         }   
 
         $exif->WriteInfo($photo_filename) unless $self->dry_run;
     }
-}
-
-# TODO: Abstract the following two methods into DateTime::Format::Panasonic
-# (or a similarly named class)
-
-# Parse Panasonic camera date format
-method _parse_camera_formatted_datetime (Str $datetime) {
-    my ($date, $time) = split ' ', $datetime;
-
-    my %datetime;
-
-    @datetime{qw(year month day)}     = split ':', $date;
-    @datetime{qw(hour minute second)} = split ':', $time;
-
-    return DateTime->new(
-        %datetime,
-        time_zone => $self->time_zone,
-    )->set_time_zone('UTC');
-}
-
-# Create DateTime object from Panasonic camera date format
-method _build_camera_formatted_datetime(DateTime $datetime) {
-    $datetime->set_time_zone($self->time_zone);
-
-    return sprintf("%d:%02d:%02d %02d:%02d:%02d",
-        $datetime->year,
-        $datetime->month,
-        $datetime->day,
-        $datetime->hour,
-        $datetime->minute,
-        $datetime->second,
-    );
 }
 
 # I'm a modulino yo!
