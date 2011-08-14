@@ -144,6 +144,7 @@ method process_photos () {
 
         for my $tag (@exif_tags) {
             my $existing_exif_dt_string = $exif->GetValue($tag);
+
             my $existing_exif_dt =
                 DateTime::Format::Exif->parse_datetime($existing_exif_dt_string);
 
