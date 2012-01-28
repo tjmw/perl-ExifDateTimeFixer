@@ -64,13 +64,19 @@ Better (any!) checking/validation of input data
 
 # See http://search.cpan.org/~doy/Moose-2.0202/
 #   lib/Moose/Manual/BestPractices.pod#Do_not_coerce_class_names_directly
-subtype 'My::DateTime' => as class_type('DateTime');
+subtype 'My::DateTime'
+    => as 'DateTime';
 
 coerce 'My::DateTime'
     => from 'Str'
     => via {
         DateTime::Format::MySQL->parse_datetime($_)
     };
+
+subtype 'My::TimeZoneString'
+    => as      'Str',
+    => where   { DateTime::TimeZone->is_valid_name($_) },
+    => message { "'$_' is not a valid time zone" };
 
 # The camera's definition of now
 has 'camera_now' => (
@@ -104,7 +110,7 @@ has 'verbose' => (
 # Time zone
 has 'time_zone' => (
     is       => 'rw',
-    isa      => 'Str',
+    isa      => 'My::TimeZoneString',
     required => 0,
     default  => 'Europe/London',
 );
