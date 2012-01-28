@@ -11,6 +11,8 @@ use DateTime;
 use DateTime::Format::MySQL;
 use DateTime::Format::Exif;
 
+use feature 'say';
+
 with 'MooseX::Getopt';
 
 =head1 NAME
@@ -42,11 +44,21 @@ The camera's definition of now, in MySQL datetime format. Required.
 
 Dry run only, don't write adjusted date time data back to file. Optional.
 
+--time_zone
+
+Time zone the photos were taken in. Optional. Defaults to "Europe/London".
+
 Examples:
 
-    perl ExifDateTimeFixer.pm --dry_run --camera_now "2008-06-08 06:08:00" ~/photos_with_bad_data/*.jpg
+    perl ExifDateTimeFixer.pm --dry_run --verbose --camera_now "2008-06-08 06:08:00" ~/photos_with_bad_data/*.jpg
 
     perl ExifDateTimeFixer.pm --camera_now "2008-06-08 06:08:00" ~/photos_with_bad_data/*.jpg
+
+    perl ExifDateTimeFixer.pm --time_zone "America/New_York" --camera_now "2008-06-08 06:08:00" ~/photos_with_bad_data/*.jpg
+
+=head1 TODO
+
+Better (any!) checking/validation of input data
 
 =cut
 
@@ -82,7 +94,14 @@ has 'dry_run' => (
     default  => 0,
 );
 
-# Time zone of the camera
+has 'verbose' => (
+    is       => 'rw',
+    isa      => 'Bool',
+    required => 0,
+    default  => 0,
+);
+
+# Time zone
 has 'time_zone' => (
     is       => 'rw',
     isa      => 'Str',
@@ -91,11 +110,21 @@ has 'time_zone' => (
 );
 
 # Array ref of filenames
-# TODO: Better checking/validation of this data
 has '_photos' => (
     is       => 'ro',
     isa      => 'ArrayRef',
-    default  => sub { shift->extra_argv },
+    default  => sub {
+        shift->extra_argv
+    },
+);
+
+# Exif tag list
+has '_exif_tags' => (
+    is       => 'ro',
+    isa      => 'ArrayRef',
+    default  => sub {
+        [qw(DateTimeOriginal ModifyDate CreateDate)]
+    },
 );
 
 # Camera's definition of now as a DateTime object.
@@ -108,18 +137,17 @@ has '_camera_now_dt' => (
         my ($self, $value) = @_;
         # Do this time_zone setting here since we don't have access
         # to $self in the coersion via method above
-        $value->set_time_zone($self->time_zone)
-            ->set_time_zone('UTC'); 
+        $value->set_time_zone($self->time_zone);
     },
 );
 
-has '_camera_off_duration' => (
+has '_camera_out_duration' => (
     is       => 'ro',
     isa      => 'DateTime::Duration',
     lazy     => 1,
     default  => sub {
         my ($self) = @_;
-        DateTime->now(time_zone => 'UTC')
+        DateTime->now(time_zone => $self->time_zone)
             - $self->_camera_now_dt
     },
 );
@@ -134,28 +162,28 @@ as described above, based on the flags and file list provided.
 =cut
 
 method process_photos () {
-    my @exif_tags = qw(DateTimeOriginal ModifyDate CreateDate);
-
     # Iterate over our list of photos, updating the specified tags
     for my $photo_filename (@{$self->_photos}) {
         my $exif = Image::ExifTool->new; 
 
         $exif->ExtractInfo($photo_filename);
 
-        for my $tag (@exif_tags) {
-            my $existing_exif_dt_string = $exif->GetValue($tag);
+        for my $tag (@{$self->_exif_tags}) {
+            my $incorrect_exif_dt_string = $exif->GetValue($tag);
 
-            my $existing_exif_dt =
-                DateTime::Format::Exif->parse_datetime($existing_exif_dt_string);
+            my $incorrect_exif_dt =
+                DateTime::Format::Exif->parse_datetime($incorrect_exif_dt_string)
+                ->set_time_zone($self->time_zone);
 
             my $adjusted_exif_dt =
-                $existing_exif_dt->clone->add_duration($self->_camera_off_duration);
+                $incorrect_exif_dt->clone->add_duration($self->_camera_out_duration);
 
             my $adjusted_exif_dt_string =
                 DateTime::Format::Exif->format_datetime($adjusted_exif_dt);
 
-            print "$photo_filename: modifying $tag"
-                . " from $existing_exif_dt_string to $adjusted_exif_dt_string\n";
+            say "$photo_filename: modifying $tag"
+                . " from $incorrect_exif_dt_string to $adjusted_exif_dt_string"
+                if $self->verbose;
 
             $exif->SetNewValue($tag, $adjusted_exif_dt_string);
         }   
@@ -164,8 +192,8 @@ method process_photos () {
     }
 }
 
-# I'm a modulino yo!
-__PACKAGE__->new_with_options()->process_photos unless caller();
+# I'm a modulino!
+__PACKAGE__->new_with_options->process_photos unless caller();
 
 =head1 AUTHOR
 
