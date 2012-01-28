@@ -163,10 +163,11 @@ as described above, based on the flags and file list provided.
 
 method process_photos () {
     # Iterate over our list of photos, updating the specified tags
+    FILE:
     for my $photo_filename (@{$self->_photos}) {
-        my $exif = Image::ExifTool->new; 
 
-        $exif->ExtractInfo($photo_filename);
+        my $exif = $self->read_exif_data($photo_filename);
+        next FILE unless $exif;
 
         for my $tag (@{$self->_exif_tags}) {
             my $incorrect_exif_dt_string = $exif->GetValue($tag);
@@ -181,15 +182,30 @@ method process_photos () {
             my $adjusted_exif_dt_string =
                 DateTime::Format::Exif->format_datetime($adjusted_exif_dt);
 
-            say "$photo_filename: modifying $tag"
-                . " from $incorrect_exif_dt_string to $adjusted_exif_dt_string"
-                if $self->verbose;
+            $self->log("$photo_filename: modifying $tag"
+                . " from $incorrect_exif_dt_string to $adjusted_exif_dt_string");
 
             $exif->SetNewValue($tag, $adjusted_exif_dt_string);
         }   
 
+        # Write new datetimes back to file
         $exif->WriteInfo($photo_filename) unless $self->dry_run;
     }
+}
+
+method read_exif_data ($photo_filename) {
+    unless (-f $photo_filename) {
+       $self->log("'$photo_filename' isn't a file. Skipping.");  
+       return;
+    }
+
+    my $exif = Image::ExifTool->new; 
+    $exif->ExtractInfo($photo_filename);
+    return $exif;
+}
+
+method log ($message) {
+    say $message if $self->verbose;
 }
 
 # I'm a modulino!
