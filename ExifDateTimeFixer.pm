@@ -166,45 +166,65 @@ method process_photos () {
     FILE:
     for my $photo_filename (@{$self->_photos}) {
 
-        my $exif = $self->read_exif_data($photo_filename);
+        my $exif = $self->_read_exif_data($photo_filename);
         next FILE unless $exif;
 
         for my $tag (@{$self->_exif_tags}) {
-            my $incorrect_exif_dt_string = $exif->GetValue($tag);
+            my $incorrect_exif_dt_string = $self->_extract_exif_field($exif, $tag);
+            
+            next FILE unless $incorrect_exif_dt_string;
 
-            my $incorrect_exif_dt =
-                DateTime::Format::Exif->parse_datetime($incorrect_exif_dt_string)
-                ->set_time_zone($self->time_zone);
+            my $adjusted_exif_dt_string = $self->_adjust_dt($incorrect_exif_dt_string);
 
-            my $adjusted_exif_dt =
-                $incorrect_exif_dt->clone->add_duration($self->_camera_out_duration);
-
-            my $adjusted_exif_dt_string =
-                DateTime::Format::Exif->format_datetime($adjusted_exif_dt);
-
-            $self->log("$photo_filename: modifying $tag"
+            $self->_log("$photo_filename: modifying $tag"
                 . " from $incorrect_exif_dt_string to $adjusted_exif_dt_string");
 
             $exif->SetNewValue($tag, $adjusted_exif_dt_string);
         }   
 
-        # Write new datetimes back to file
-        $exif->WriteInfo($photo_filename) unless $self->dry_run;
+        $self->_write_adjustments_to_file($exif, $photo_filename);
     }
 }
 
-method read_exif_data ($photo_filename) {
+method _read_exif_data ($photo_filename) {
     unless (-f $photo_filename) {
-       $self->log("'$photo_filename' isn't a file. Skipping.");  
+       $self->_log("'$photo_filename' isn't a file.");  
        return;
     }
 
     my $exif = Image::ExifTool->new; 
     $exif->ExtractInfo($photo_filename);
+
     return $exif;
 }
 
-method log ($message) {
+method _extract_exif_field ($exif, $tag) {
+    my $value = $exif->GetValue($tag);
+
+    unless ($value) {
+       $self->_log("tag '$tag' not found.");  
+       return;
+    }
+
+    return $value;
+}
+
+method _adjust_dt ($incorrect_exif_dt_string) {
+    my $incorrect_exif_dt =
+        DateTime::Format::Exif->parse_datetime($incorrect_exif_dt_string)
+        ->set_time_zone($self->time_zone);
+
+    my $adjusted_exif_dt =
+        $incorrect_exif_dt->clone->add_duration($self->_camera_out_duration);
+
+    return DateTime::Format::Exif->format_datetime($adjusted_exif_dt);
+}
+
+method _write_adjustments_to_file ($exif, $photo_filename) {
+    $exif->WriteInfo($photo_filename) unless $self->dry_run;
+}
+
+method _log ($message) {
     say $message if $self->verbose;
 }
 
